@@ -41,6 +41,12 @@ function Dashboard() {
     );
   };
 
+  // Format phone number to show only last 3 digits
+  const formatPhoneNumber = (phone) => {
+    if (!phone || phone.length < 3) return '*******';
+    return '*******' + phone.slice(-3);
+  };
+
   const fetchStudentData = async () => {
     const registrationNumber = localStorage.getItem('register_number');
     if (!registrationNumber) {
@@ -77,7 +83,6 @@ function Dashboard() {
 
   const toggleEdit = () => {
     if (!isEditable) {
-      // When enabling edit, check if fields are filled
       if (!areFieldsValid()) {
         setFormError('Please fill all editable fields before editing.');
       } else {
@@ -97,7 +102,6 @@ function Dashboard() {
       return;
     }
 
-    // Validate fields before sending OTP request
     if (!areFieldsValid()) {
       console.error('Missing required fields:', {
         email: studentData.email,
@@ -144,7 +148,6 @@ function Dashboard() {
       return;
     }
 
-    // Validate input data
     if (
       !otp.join('') ||
       !studentData.email ||
@@ -194,10 +197,8 @@ function Dashboard() {
         console.log('Student data updated successfully:', data);
         setOtpError('');
         setFormError('');
-        setShowOtpInput(false); // Hide OTP input after successful save
-        setIsEditable(false); // Lock fields after saving
-        // Optionally navigate to a success page
-        // navigate('/success');
+        setShowOtpInput(false);
+        setIsEditable(false);
       } else {
         const errorData = await response.json().catch(() => ({}));
         console.error('Failed to update student data:', response.status, response.statusText, errorData);
@@ -215,7 +216,6 @@ function Dashboard() {
       newOtp[index] = value;
       setOtp(newOtp);
 
-      // Auto-focus next input
       if (value && index < 5) {
         otpInputs.current[index + 1].focus();
       }
@@ -228,7 +228,6 @@ function Dashboard() {
     }
   };
 
-  // Handle outside click to close account box
   useEffect(() => {
     const handleOutsideClick = (event) => {
       if (showAccountBox && accountBoxRef.current && !accountBoxRef.current.contains(event.target)) {
@@ -253,7 +252,6 @@ function Dashboard() {
     }
   }, [showAccountBox]);
 
-  // Update form error when studentData changes
   useEffect(() => {
     if (isEditable && !areFieldsValid()) {
       setFormError('Please fill all editable fields.');
@@ -284,7 +282,6 @@ function Dashboard() {
             PROFILE
           </button>
 
-          {/* Menu Box */}
           {showMenu && (
             <div className="absolute top-12 right-0 w-64 bg-white border border-gray-200 shadow-lg rounded-md z-50">
               <ul className="p-4 space-y-2 text-gray-800">
@@ -355,9 +352,7 @@ function Dashboard() {
             <h2 className="text-xl font-bold text-gray-800 mb-1">{studentData.name}</h2>
             <p className="text-sm text-gray-500 mb-6">Student, Krishna University</p>
 
-            {/* Profile Input Fields */}
             <div className="w-full space-y-6">
-              {/* Non-Editable Fields */}
               {[
                 { label: "Registration Number", type: "text", key: "register_number" },
                 { label: "Name", type: "text", key: "name" },
@@ -376,7 +371,6 @@ function Dashboard() {
                 </div>
               ))}
 
-              {/* Editable Fields Section */}
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium text-gray-600">Editable Information</h3>
                 <button
@@ -426,9 +420,12 @@ function Dashboard() {
               ))}
               {formError && <p className="text-red-600 text-sm mt-2">{formError}</p>}
 
-              {/* OTP Input */}
               {showOtpInput && (
                 <div className="mt-6">
+                  <h5 className="text-sm text-gray-600 font-medium mb-2">
+                    OTP sent to your registered mobile number ending in{' '}
+                    <span className="font-semibold">{formatPhoneNumber(studentData.phone_number)}</span>
+                  </h5>
                   <label className="block text-sm text-gray-600 font-medium mb-2">
                     Enter OTP
                   </label>
@@ -452,8 +449,7 @@ function Dashboard() {
             </div>
           </div>
 
-          {/* Buttons at bottom */}
-          <div className="sticky bottom-0 bg-white pt-4 mt-4 border-t border-gray-200">
+          <div className=" bottom-0 bg-white pt-4 mt-4 border-t border-gray-200">
             <div className="w-full flex justify-between">
               <button
                 onClick={() => {
@@ -490,7 +486,6 @@ function Dashboard() {
         </div>
       )}
 
-      {/* Typing Animation Styles */}
       <style jsx="true" global="true">{`
         .typing-animation-container {
           position: relative;
