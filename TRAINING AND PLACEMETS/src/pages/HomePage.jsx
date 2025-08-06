@@ -4,8 +4,9 @@ import ProfessionalMarquee from '../components/ProfessionalMarquee';
 import useTypingAnimation from '../hooks/useTypingAnimation';
 
 function HomePage() {
-  const { displayedText } = useTypingAnimation('Welcome to', 150, 3000);
   const permanentText = " Krishna University Training and Placements";
+  const { displayedText } = useTypingAnimation('Welcome to', 150, 3000);
+  
 
   return (
     <div className="min-h-screen bg-white">

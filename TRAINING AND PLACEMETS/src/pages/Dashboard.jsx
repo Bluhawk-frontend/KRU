@@ -24,8 +24,28 @@ function Dashboard() {
   const [showOtpInput, setShowOtpInput] = useState(false);
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [otpError, setOtpError] = useState('');
+  const [formError, setFormError] = useState('');
   const navigate = useNavigate();
   const otpInputs = useRef([]);
+  const accountBoxRef = useRef(null);
+
+  // Check if all editable fields are filled
+  const areFieldsValid = () => {
+    return (
+      studentData.email &&
+      studentData.date_of_birth &&
+      studentData.gender &&
+      studentData.father_name &&
+      studentData.mother_name &&
+      studentData.aadhar_number
+    );
+  };
+
+  // Format phone number to show only last 3 digits
+  const formatPhoneNumber = (phone) => {
+    if (!phone || phone.length < 3) return '*******';
+    return '*******' + phone.slice(-3);
+  };
 
   const fetchStudentData = async () => {
     const registrationNumber = localStorage.getItem('register_number');
@@ -54,18 +74,27 @@ function Dashboard() {
           gender: data.gender || 'Not Specified',
         });
       } else {
-        console.error('Failed to fetch student data:', response.status);
+        console.error('Failed to fetch student data:', response.status, response.statusText);
       }
     } catch (error) {
-      console.error('Error fetching student data:', error);
+      console.error('Error fetching student data:', error.message, error.stack);
     }
   };
 
   const toggleEdit = () => {
+    if (!isEditable) {
+      if (!areFieldsValid()) {
+        setFormError('Please fill all editable fields before editing.');
+      } else {
+        setFormError('');
+      }
+    } else {
+      setFormError('');
+    }
     setIsEditable((prev) => !prev);
   };
 
-  const handleSave = async () => {
+  const handleConfirm = async () => {
     const registrationNumber = localStorage.getItem('register_number');
     if (!registrationNumber) {
       console.error('No registration number found in localStorage');
@@ -73,8 +102,21 @@ function Dashboard() {
       return;
     }
 
+    if (!areFieldsValid()) {
+      console.error('Missing required fields:', {
+        email: studentData.email,
+        dob: studentData.date_of_birth,
+        gender: studentData.gender,
+        father_name: studentData.father_name,
+        mother_name: studentData.mother_name,
+        aadhar_number: studentData.aadhar_number,
+      });
+      setFormError('Please fill all editable fields before confirming.');
+      return;
+    }
+
     try {
-      const response = await fetch('http://127.0.0.1:8000/auth/student/', {
+      const response = await fetch(`http://127.0.0.1:8000/auth/send-student-otp/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -86,13 +128,85 @@ function Dashboard() {
         setShowOtpInput(true);
         setOtp(['', '', '', '', '', '']);
         setOtpError('');
+        setFormError('');
       } else {
-        console.error('Failed to send OTP:', response.status);
-        setOtpError('Failed to send OTP. Please try again.');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to send OTP:', response.status, response.statusText, errorData);
+        setOtpError(`Failed to send OTP: ${errorData.message || 'Please try again.'}`);
       }
     } catch (error) {
-      console.error('Error sending OTP:', error);
-      setOtpError('Error sending OTP. Please try again.');
+      console.error('Error sending OTP:', error.message, error.stack);
+      setOtpError('Error sending OTP: Network or server issue. Please try again.');
+    }
+  };
+
+  const handleSave = async () => {
+    const registrationNumber = localStorage.getItem('register_number');
+    if (!registrationNumber) {
+      console.error('No registration number found in localStorage');
+      navigate('/login');
+      return;
+    }
+
+    if (
+      !otp.join('') ||
+      !studentData.email ||
+      !studentData.date_of_birth ||
+      !studentData.gender ||
+      !studentData.father_name ||
+      !studentData.mother_name ||
+      !studentData.aadhar_number
+    ) {
+      console.error('Missing required fields:', {
+        otp: otp.join(''),
+        email: studentData.email,
+        dob: studentData.date_of_birth,
+        gender: studentData.gender,
+        father_name: studentData.father_name,
+        mother_name: studentData.mother_name,
+        aadhar_number: studentData.aadhar_number,
+      });
+      setOtpError('All fields and OTP are required. Please fill out completely.');
+      return;
+    }
+
+    const payload = {
+      register_number: registrationNumber.toUpperCase(),
+      otp: otp.join(''),
+      email: studentData.email,
+      dob: studentData.date_of_birth,
+      gender: studentData.gender,
+      father_name: studentData.father_name,
+      mother_name: studentData.mother_name,
+      aadhar_number: studentData.aadhar_number,
+    };
+
+    console.log('Sending request to API with payload:', payload);
+
+    try {
+      const response = await fetch('http://127.0.0.1:8000/auth/update-student/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Student data updated successfully:', data);
+        setOtpError('');
+        setFormError('');
+        setShowOtpInput(false);
+        setIsEditable(false);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to update student data:', response.status, response.statusText, errorData);
+        setOtpError(`Failed to update student data: ${errorData.message || 'Please try again.'}`);
+      }
+    } catch (error) {
+      console.error('Error updating student data:', error.message, error.stack);
+      setOtpError('Error updating student data: Network or server issue. Please try again.');
     }
   };
 
@@ -102,7 +216,6 @@ function Dashboard() {
       newOtp[index] = value;
       setOtp(newOtp);
 
-      // Auto-focus next input
       if (value && index < 5) {
         otpInputs.current[index + 1].focus();
       }
@@ -115,57 +228,37 @@ function Dashboard() {
     }
   };
 
-  const handleConfirm = async () => {
-  const enteredOtp = otp.join('');
-  if (enteredOtp === '123456') { // Mocked OTP
-    alert('OTP verified! Saving your profile details...');
-
-    // Prepare the data to be sent in the API request
-    const updatedData = {
-      register_number: localStorage.getItem('register_number'), // Fetch register number from localStorage
-      otp: enteredOtp,
-      email: studentData.email,
-      dob: studentData.date_of_birth,
-      gender: studentData.gender,
-      father_name: studentData.father_name,
-      mother_name: studentData.mother_name,
-      aadhar_number: studentData.aadhar_number,
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (showAccountBox && accountBoxRef.current && !accountBoxRef.current.contains(event.target)) {
+        setShowAccountBox(false);
+        setShowOtpInput(false);
+        setOtp(['', '', '', '', '', '']);
+        setOtpError('');
+        setFormError('');
+        setIsEditable(false);
+      }
     };
 
-    try {
-      const response = await fetch('http://127.0.0.1:8000/auth/student/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updatedData),
-      });
-
-      if (response.ok) {
-        const responseData = await response.json();
-        console.log('Profile updated successfully:', responseData);
-        alert('Your profile has been updated successfully.');
-        setShowOtpInput(false);
-        setIsEditable(false);
-      } else {
-        console.error('Failed to update profile:', response.status);
-        setOtpError('Failed to update profile. Please try again.');
-      }
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      setOtpError('Error updating profile. Please try again.');
-    }
-  } else {
-    setOtpError('Invalid OTP. Please try again.');
-  }
-};
-
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [showAccountBox]);
 
   useEffect(() => {
     if (showAccountBox) {
       fetchStudentData();
     }
   }, [showAccountBox]);
+
+  useEffect(() => {
+    if (isEditable && !areFieldsValid()) {
+      setFormError('Please fill all editable fields.');
+    } else {
+      setFormError('');
+    }
+  }, [studentData, isEditable]);
 
   return (
     <div className="min-h-screen bg-white relative">
@@ -189,7 +282,6 @@ function Dashboard() {
             PROFILE
           </button>
 
-          {/* Menu Box */}
           {showMenu && (
             <div className="absolute top-12 right-0 w-64 bg-white border border-gray-200 shadow-lg rounded-md z-50">
               <ul className="p-4 space-y-2 text-gray-800">
@@ -250,7 +342,7 @@ function Dashboard() {
       </main>
 
       {showAccountBox && (
-        <div className="absolute top-20 right-10 w-[400px] bg-white rounded-xl shadow-2xl z-50 p-6 font-sans border border-gray-200 min-h-[85vh] flex flex-col justify-between">
+        <div ref={accountBoxRef} className="absolute top-20 right-2 w-[400px] bg-white rounded-xl shadow-2xl z-50 p-6 font-sans border border-gray-200 max-h-[90vh] overflow-y-auto">
           <div className="flex flex-col items-center">
             <img
               src="https://pbs.twimg.com/profile_images/1613166539775299591/jGFXbzd__400x400.jpg"
@@ -260,9 +352,7 @@ function Dashboard() {
             <h2 className="text-xl font-bold text-gray-800 mb-1">{studentData.name}</h2>
             <p className="text-sm text-gray-500 mb-6">Student, Krishna University</p>
 
-            {/* Profile Input Fields */}
             <div className="w-full space-y-6">
-              {/* Non-Editable Fields */}
               {[
                 { label: "Registration Number", type: "text", key: "register_number" },
                 { label: "Name", type: "text", key: "name" },
@@ -281,7 +371,6 @@ function Dashboard() {
                 </div>
               ))}
 
-              {/* Editable Fields Section */}
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium text-gray-600">Editable Information</h3>
                 <button
@@ -306,7 +395,7 @@ function Dashboard() {
                 </button>
               </div>
               {[
-                { label: "Date of Birth", type: "text", placeholder: "Enter Date of Birth", key: "date_of_birth" },
+                { label: "Date of Birth", type: "text", placeholder: "Enter Date of Birth (YYYY-MM-DD)", key: "date_of_birth" },
                 { label: "Father's Name", type: "text", placeholder: "Enter Father's Name", key: "father_name" },
                 { label: "Mother's Name", type: "text", placeholder: "Enter Mother's Name", key: "mother_name" },
                 { label: "Email", type: "email", placeholder: "Enter Email Address", key: "email" },
@@ -329,10 +418,14 @@ function Dashboard() {
                   />
                 </div>
               ))}
+              {formError && <p className="text-red-600 text-sm mt-2">{formError}</p>}
 
-              {/* OTP Input */}
               {showOtpInput && (
                 <div className="mt-6">
+                  <h5 className="text-sm text-gray-600 font-medium mb-2">
+                    OTP sent to your registered mobile number ending in{' '}
+                    <span className="font-semibold">{formatPhoneNumber(studentData.phone_number)}</span>
+                  </h5>
                   <label className="block text-sm text-gray-600 font-medium mb-2">
                     Enter OTP
                   </label>
@@ -356,39 +449,43 @@ function Dashboard() {
             </div>
           </div>
 
-          {/* Buttons at bottom */}
-          <div className="w-full mt-6 flex justify-between">
-            <button
-              onClick={() => {
-                setShowAccountBox(false);
-                setShowOtpInput(false);
-                setOtp(['', '', '', '', '', '']);
-                setOtpError('');
-              }}
-              className="w-1/2 bg-gray-100 hover:bg-gray-200 text-gray-800 py-2 rounded-lg font-semibold transition"
-            >
-              Close
-            </button>
-            {showOtpInput ? (
+          <div className=" bottom-0 bg-white pt-4 mt-4 border-t border-gray-200">
+            <div className="w-full flex justify-between">
               <button
-                onClick={handleConfirm}
-                className="w-1/2 ml-4 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold transition"
+                onClick={() => {
+                  setShowAccountBox(false);
+                  setShowOtpInput(false);
+                  setOtp(['', '', '', '', '', '']);
+                  setOtpError('');
+                  setFormError('');
+                  setIsEditable(false);
+                }}
+                className="w-1/2 bg-gray-100 hover:bg-gray-200 text-gray-800 py-2 rounded-lg font-semibold transition"
               >
-                Confirm
+                Close
               </button>
-            ) : (
-              <button
-                onClick={handleSave}
-                className="w-1/2 ml-4 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold transition"
-              >
-                Save
-              </button>
-            )}
+              {showOtpInput ? (
+                <button
+                  onClick={handleSave}
+                  className="w-1/2 ml-4 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold transition disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  disabled={!otp.join('')}
+                >
+                  Save
+                </button>
+              ) : (
+                <button
+                  onClick={handleConfirm}
+                  className="w-1/2 ml-4 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold transition disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  disabled={!isEditable || !areFieldsValid()}
+                >
+                  Confirm
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Typing Animation Styles */}
       <style jsx="true" global="true">{`
         .typing-animation-container {
           position: relative;

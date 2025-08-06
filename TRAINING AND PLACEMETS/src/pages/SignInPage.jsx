@@ -33,6 +33,12 @@ const SignInPage = () => {
     return result;
   };
 
+  // Format phone number to show only last 3 digits
+  const formatPhoneNumber = (phone) => {
+    if (!phone || phone.length < 3) return '*******';
+    return '*******' + phone.slice(-3);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -62,8 +68,8 @@ const SignInPage = () => {
         setRegistrationNumber(response.data.regNo || registrationNumber.toUpperCase());
         setOtpSent(true);
         setShowOtpAndCaptcha(true);
-        const maskedPhone = `*******${response.data.phone_number.slice(-3)}`;
-        setOtpSuccessMessage(response.data.message || `OTP sent to this number: ${maskedPhone}`);
+        const maskedPhone = formatPhoneNumber(response.data.phone_number);
+        setOtpSuccessMessage(`OTP sent to your registered mobile number ending in ${maskedPhone}`);
         console.log('Student OTP success message set:', `OTP sent to this number: ${maskedPhone}`);
         setCaptcha(generateCaptcha());
       } else if (role === 'university') {
@@ -161,11 +167,6 @@ const SignInPage = () => {
     }
   };
 
-  const handleCloseDialog = () => {
-    setOtpSent(false);
-    setOtpSuccessMessage('');
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-100 to-white flex flex-col p-6">
       <header className="flex flex-col md:flex-row justify-between items-center p-4 border-b border-gray-200">
@@ -259,9 +260,6 @@ const SignInPage = () => {
                       </button>
                     </div>
                   </div>
-                  {otpSent && otpSuccessMessage && (
-                    <p className="text-sm text-green-600 text-center mt-4">{otpSuccessMessage}</p>
-                  )}
                   {error && <p className="text-red-600 text-center mt-4">{error}</p>}
                 </form>
               )}
@@ -269,6 +267,9 @@ const SignInPage = () => {
                 <form onSubmit={handleOtpAndCaptchaSubmit} className="space-y-6">
                   <div className="flex flex-col space-y-4">
                     <div>
+                      <h5 className="text-sm text-gray-600 font-medium mb-2">
+                        {otpSuccessMessage}
+                      </h5>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Enter OTP :</label>
                       <input
                         type="text"
@@ -402,7 +403,10 @@ const SignInPage = () => {
                 <div className="mt-6 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg text-center">
                   <p>{otpSuccessMessage}</p>
                   <button
-                    onClick={handleCloseDialog}
+                    onClick={() => {
+                      setOtpSent(false);
+                      setOtpSuccessMessage('');
+                    }}
                     className="mt-2 bg-green-500 text-white p-2 rounded-lg hover:bg-green-600"
                   >
                     Close
